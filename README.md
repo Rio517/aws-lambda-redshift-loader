@@ -77,8 +77,12 @@ To deploy the function:
 1.	Go to the AWS Lambda Console in the same region as your S3 bucket and Amazon Redshift cluster.
 2.	Select Create a Lambda function and enter the name MyLambdaDBLoader (for example).
 3.	Under Code entry type select 'Upload a zip file' and upload the [AWSLambdaRedshiftLoader-2.2.0.zip](https://github.com/awslabs/aws-lambda-redshift-loader/blob/master/dist/AWSLambdaRedshiftLoader-2.2.0.zip) from your local ```dist``` folder
-4.	Use the default values of index.js for the filename and handler for the handler, and follow the wizard for creating the AWS Lambda Execution Role (required permissions below).  We also recommend using the max timeout for the function to accomodate long COPY times.
-5.	On the deployed function, select Configure Event Source and select the bucket you want to use for input data. Ensure that you have selected 'Object Created' or the 'ObjectCreated:*' notification type.
+4.	Use the default values for the handler, and in the Role drop-down, select "* Basic Execution Role" and follow the wizard for creating the AWS Lambda Execution Role (required permissions below).  We also recommend using the max timeout (5 minutes) for the function to accommodate long COPY times.
+5.	On the deployed function, you need to add an event source:
+    1. select "Event Source" tab and click to "Add event source."
+    2. The event source type should be set to S3.
+    3. Select the S3 bucket you want to use for input data.
+    4. Select the 'Object Created (All)' notification type.
 
 When you're done, you'll see that the AWS Lambda function is deployed and you 
 can submit test events and view the CloudWatch Logging log streams.
@@ -165,9 +169,9 @@ for US East use `us-east-1`, and for Dublin use `eu-west-1`.
 
 ```export AWS_REGION=eu-central-1``` 
 
-Next, run the setup.js script by entering node setup.js. The script asks questions 
-about how the load should be done, including those outlined in the setup appendix 
-as the end of this document. 
+Next, run the setup.js script by running the command `node setup.js`. The script 
+asks questions about how the load should be done, including those outlined in 
+the setup appendix as the end of this document.
 
 All data used to manage the lifecycle of data loads is stored in DynamoDB, and 
 the setup script automatically provisions the following tables:
