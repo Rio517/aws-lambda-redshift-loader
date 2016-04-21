@@ -79,7 +79,7 @@ To deploy the function:
 3.	Under Code entry type select 'Upload a zip file' and upload the [AWSLambdaRedshiftLoader-2.2.0.zip](https://github.com/awslabs/aws-lambda-redshift-loader/blob/master/dist/AWSLambdaRedshiftLoader-2.2.0.zip) from your local ```dist``` folder
 4.	Use the default values for the handler, and in the Role drop-down, select "* Basic Execution Role" and follow the wizard for creating the AWS Lambda Execution Role (required permissions below).  We also recommend using the max timeout (5 minutes) for the function to accommodate long COPY times.
 5.	On the deployed function, you need to add an event source:
-    1. select "Event Source" tab and click to "Add event source."
+    1. Select "Event Source" tab and click to "Add event source."
     2. The event source type should be set to S3.
     3. Select the S3 bucket you want to use for input data.
     4. Select the 'Object Created (All)' notification type.
