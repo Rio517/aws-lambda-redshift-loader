@@ -66,6 +66,9 @@ To configure a cluster security group for access:
 4.	Add a new Connection Type of CIDR/IP and enter the value 0.0.0.0/0.
 5.	Select Authorize to save your changes.
 
+### Database Setup
+
+### Database Permissions
 We recommend granting Amazon Redshift users only INSERT rights on tables to be 
 loaded. Create a user with a complex password using the CREATE USER command 
 (http://docs.aws.amazon.com/redshift/latest/dg/r_CREATE_USER.html), and grant 
@@ -76,31 +79,16 @@ To deploy the function:
 
 1.	Go to the AWS Lambda Console in the same region as your S3 bucket and Amazon Redshift cluster.
 2.	Select Create a Lambda function and enter the name MyLambdaDBLoader (for example).
-3.	Under Code entry type select 'Upload a zip file' and upload the [AWSLambdaRedshiftLoader-2.2.0.zip](https://github.com/awslabs/aws-lambda-redshift-loader/blob/master/dist/AWSLambdaRedshiftLoader-2.2.0.zip) from your local ```dist``` folder
-4.	Use the default values for the handler, and in the Role drop-down, select "* Basic Execution Role" and follow the wizard for creating the AWS Lambda Execution Role (required permissions below).  We also recommend using the max timeout (5 minutes) for the function to accommodate long COPY times.
-5.	On the deployed function, you need to add an event source:
+3.	Under Code entry type select 'Upload a zip file' and upload the [AWSLambdaRedshiftLoader-2.4.0.zip](https://github.com/awslabs/aws-lambda-redshift-loader/blob/master/dist/AWSLambdaRedshiftLoader-2.4.0.zip) from your local ```dist``` folder. **Note:** If you've previously deployed or are upgrading, please see the [upgrade notes](#upgrade-notes-lambda-function-versions).
+4.	Use the default values for the handler, and in the Role drop-down, select "* Basic Execution Role" and follow the wizard for creating the AWS Lambda Execution Role, view and edit the policy permissions to the required permissions below.  We also recommend using the max timeout (5 minutes) for the function to accommodate long COPY times.
+5.	Once deployed, you need to add an event source:
     1. Select "Event Source" tab and click to "Add event source."
     2. The event source type should be set to S3.
     3. Select the S3 bucket you want to use for input data.
     4. Select the 'Object Created (All)' notification type.
 
 When you're done, you'll see that the AWS Lambda function is deployed and you 
-can submit test events and view the CloudWatch Logging log streams.
-
-### Lambda Function Versions
-We previously released version 1.0 in distribution AWSLambdaRedshiftLoader.zip, 
-which didn't use the Amazon Key Management Service for encryption. If you've 
-previously deployed and used version 1.0 and want to upgrade to version 1.1, 
-then you'll need to recreate your configuration by running `node setup.js` and 
-reentering the previous values including connection password, symmetric encryption key, and optionally an S3 Secret Key. 
-You'll also need to upgrade the IAM policy for the Lambda Execution Role as listed 
-below, as it now requires permissions to talk to the Key Management Service.
-
-Furthermore, version 2.0.0 adds support for loading multiple Redshift clusters in 
-parallel. You can deploy the 2.x versions with a 1.1x configuration, and the 
-Lambda function will transparently upgrade your configuration to a 2.x compatible 
-format. This uses a loadClusters List type in DynamoDB to track all clusters to 
-be loaded.
+can submit test events and view the CloudWatch Logging log streams.  
 
 ## Getting Started - Lambda Execution Role
 You also need to add an IAM policy as shown below to the role that AWS Lambda 
@@ -109,7 +97,7 @@ the `LambdaExecRole` to enable AWS Lambda to call SNS, use DynamoDB, write Manif
 files to S3, perform encryption with the AWS Key Management Service, and pass STS temporary
 credentials to Redshift for the COPY command:
 
-```
+```json
 {
     "Version": "2012-10-17",
     "Statement": [
@@ -151,37 +139,61 @@ credentials to Redshift for the COPY command:
 This function can send notifications on completion of batch processing. Using SNS, 
 you can then receive notifications through email and HTTP Push to an application, 
 or put them into a queue for later processing. You can even invoke additional Lambda
-functions to complete your data load workflow using an [SNS Event Sources](http://docs.aws.amazon.com/sns/latest/dg/sns-lambda.html) for another
-AWS Lambda function. If you would like to receive SNS notifications for succeeded 
+functions to complete your data load workflow using an [SNS Event Sources](http://docs.aws.amazon.com/sns/latest/dg/sns-lambda.html) for another AWS Lambda function. If you would like to receive SNS notifications for succeeded
 loads, failed loads, or both, create SNS Topics and take note of their ID's in the 
 form of Amazon Resource Notations (ARN). 
 
-## Getting Started - Entering the Configuration
+## Getting Started - Configuration
+
 Now that your function is deployed, we need to create a configuration which tells 
-it how and if files should be loaded from S3. Simply install AWS SDK for Javascript 
-and configure it with credentials as outlined at http://docs.aws.amazon.com/AWSJavaScriptSDK/guide/node-intro.html and http://docs.aws.amazon.com/AWSJavaScriptSDK/guide/node-configuring.html. You'll also need a local instance of Node.js - today the included Client Tools such as `setup.js` only run under pre-ES6 versions of Node (0.10 and 0.12 have been tested). NVM (https://github.com/creationix/nvm/blob/master/README.markdown) is a simple way to install and switch between node versions. Then install dependencies using the following command:
+it how and if files should be loaded from S3.
 
-`cd aws-lambda-redshift-loader && npm install`
+### Preparing to configure
+You'll need a local instance of Node.js. The following commands will install all depedencies includes the AWS SDK for Javascript.
 
-In order to ensure communication with the correct AWS Region, you'll need to set 
-an environment variable `AWS_REGION` to the desired location. For example, 
-for US East use `us-east-1`, and for Dublin use `eu-west-1`.
+
+```
+git clone https://github.com/awslabs/aws-lambda-redshift-loader.git
+cd aws-lambda-redshift-loader
+npm install
+```
+
+The AWS SDK for Javascript must be configured with your credentials. You can
+either configure your credentials as outlined at
+http://docs.aws.amazon.com/AWSJavaScriptSDK/guide/node-intro.html and
+http://docs.aws.amazon.com/AWSJavaScriptSDK/guide/node-configuring.html or
+export them as environment variables in your shell with the following command:
+
+```export AWS_ACCESS_KEY_ID=XXXXXXXXX AWS_SECRET_ACCESS_KEY=XXXXXXXXXXX```
+
+**Note on Node Versions: today the included Client Tools such as `setup.js` only
+**run under pre-ES6 versions of Node (0.10 and 0.12 have been tested). NVM
+**(https://github.com/creationix/nvm/blob/master/README.markdown) is a simple
+**way to install and switch between node versions.
+
+Now, in order to ensure communication with the correct AWS Region, you'll need
+to set an environment variable `AWS_REGION` to the desired location. For
+example,  for US East use `us-east-1`, and for Dublin use `eu-west-1`.
 
 ```export AWS_REGION=eu-central-1``` 
 
-Next, run the setup.js script by running the command `node setup.js`. The script 
-asks questions about how the load should be done, including those outlined in 
-the setup appendix as the end of this document.
+### Running `setup.js`
 
-All data used to manage the lifecycle of data loads is stored in DynamoDB, and 
-the setup script automatically provisions the following tables:
+Next, run the setup.js script by running the command. The script 
+asks questions about how the load should be done, including those outlined in 
+the [Configuration appendix](#configuration-reference) at the end of this document.
+
+```node setup.js```
+
+The setup script automatically provisions the tables used to manage the 
+lifecycle of data loads in DynamoDB. The script will create the following tables:
 
 * LambdaRedshiftBatchLoadConfig - Stores the configuration of how files in an S3 input prefix should be loaded into Amazon Redshift.
 * LambdaRedshiftBatches - Stores the list of all historical and open batches that have been created. There will always be one open batch, and may be multiple closed batches per S3 input prefix from LambdaRedshiftBatchLoadConfig.
 * LambdaRedshiftProcessedFiles - Stores the list of all files entered into a batch, which is also used for deduplication of input files.
 
-*** IMPORTANT ***
-The tables used by this function are created with a max read & write per-second rate
+*** IMPORTANT NOTE: Maximum Concurrent File Uploads ***
+The DynamoDB tables used by this function are created with a max read & write per-second rate
 of 5. This means that you will be able to accommodate 5 concurrent file uploads
 per second being managed by ALL input locations which are event sources to this
 Lambda function. If you require more than 5 concurrent invocations/second, then 
@@ -195,7 +207,7 @@ When you enter the configuration, you must provide an S3 Prefix. This is used by
 
 ### Hive Partitioning Style Wildcards
 
-You may have implemented a great practice of segregating S3 objects using time oriented buckets. Data for January 2016 sits in a prefix ```mybucket/data/<type>/2016/01``` while data for Feburary is in ```mybucket/data/<type>/2016/02```. Rather than having to create one configuration per year and month, you can instead you Hive Partitioning style prefixes. If you place S3 objects into a prefix ```mybucket/data/<type>/yyyy=2016/dd=01```, you can then create a configuration with an S3 prefix ```mybucket/data/<type>/yyyy=*/dd=*```. The incoming event will be pre-processed and files which use this convention will always match the wildcard configuration.
+You may have implemented a great practice of segregating S3 objects using time oriented buckets. Data for January 2016 sits in a prefix ```mybucket/data/<type>/2016/01``` while data for February is in ```mybucket/data/<type>/2016/02```. Rather than having to create one configuration per year and month, you can instead you Hive Partitioning style prefixes. If you place S3 objects into a prefix ```mybucket/data/<type>/yyyy=2016/dd=01```, you can then create a configuration with an S3 prefix ```mybucket/data/<type>/yyyy=*/dd=*```. The incoming event will be pre-processed and files which use this convention will always match the wildcard configuration.
 
 ### S3 Prefix Matching
 
@@ -211,6 +223,16 @@ In some cases, you may want to have a configuration for most parts of a prefix, 
 | ```vendor-uploads/inbound/unregistered-new-data-feed/csv/upload.zip``` | ```vendor-uploads/inbound/``` |
 | ```vendor-uploads/inbound/vendor1/csv/upload.zip``` | ```vendor-uploads/inbound/vendor1``` |
 | ```vendor-uploads/inbound/vendor2/csv/upload.zip``` | ```vendor-uploads/inbound/vendor2``` |
+
+
+## Getting Started - Setup Complete
+
+You are now ready to go. Simply place files that meet the configured format into 
+S3 at the location that you configured as the input location, and watch as AWS 
+Lambda loads them into your Amazon Redshift Cluster. You are charged by the number 
+of input files that are processed, plus a small charge for DynamoDB. You now have 
+a highly available load framework which doesn't require you manage servers!
+
 
 # Security
 The database password, as well as the a master symmetric key used for encryption 
@@ -230,12 +252,6 @@ format (you will see a new loadClusters List type in your configuration). You
 can then use the ```addAdditionalClusterEndpoint.js``` to add new clusters into 
 a single configuration. This will require you enter the vital details for the 
 cluster including endpoint address and port, DB name and password.
-
-You are now ready to go. Simply place files that meet the configured format into 
-S3 at the location that you configured as the input location, and watch as AWS 
-Lambda loads them into your Amazon Redshift Cluster. You are charged by the number 
-of input files that are processed, plus a small charge for DynamoDB. You now have 
-a highly available load framework which doesn't require you manage servers!
 
 
 ## Viewing Previous Batches & Status
@@ -417,7 +433,7 @@ WorkLoadManagement queue slots.
 Item | Required | Notes
 :---- | :--------: | :-----
 Enter the Region for the Redshift Load Configuration| Y | Any AWS Region from http://docs.aws.amazon.com/general/latest/gr/rande.html, using the short name (for example us-east-1 for US East 1)
-Enter the S3 Bucket & Prefix to watch for files | Y | An S3 Path in format `<bucket name>/<prefix>`. Prefix is optional
+Enter the S3 Bucket & Prefix to watch for files | Y | An S3 Path in format `<bucket name>/<prefix>`. Prefix is optional.
 Enter a Filename Filter Regex | N | A Regular Expression used to filter files which appeared in the input prefix before they are processed.
 Enter the Cluster Endpoint | Y | The Amazon Redshift Endpoint Address for the Cluster to be loaded.
 Enter the Cluster Port | Y | The port on which you have configured your Amazon Redshift Cluster to run.
@@ -441,6 +457,23 @@ How many files should be buffered before loading? | Y | Enter the number of file
 How old should we allow a Batch to be before loading (seconds)? | N | AWS Lambda will attempt to sweep out 'old' batches using this value as the number of seconds old a batch can be before loading. This 'sweep' is on every S3 event on the input location, regardless of whether it matches the Filename Filter Regex. Not recommended to be below 120.
 Additional Copy Options to be added | N | Enter any additional COPY options that you would like to use, as outlined at (http://docs.aws.amazon.com/redshift/latest/dg/r_COPY.html). Please also see http://blogs.aws.amazon.com/bigdata/post/Tx2ANLN1PGELDJU/Best-Practices-for-Micro-Batch-Loading-on-Amazon-Redshift for information on good practices for COPY options in high frequency load environments.
 If Encrypted Files are used, Enter the Symmetric Master Key Value | N |
+
+## Upgrade Notes: Lambda Function Versions
+
+We previously released version 1.0 in distribution AWSLambdaRedshiftLoader.zip, 
+which didn't use the Amazon Key Management Service for encryption. If you've 
+previously deployed and used version 1.0 and want to upgrade to version 1.1, 
+then you'll need to recreate your configuration by running `node setup.js` again 
+and reentering the previous values including connection password, symmetric
+encryption key, and optionally an S3 Secret Key. You'll also need to upgrade the 
+IAM policy for the Lambda Execution Role as listed below, as it now requires 
+permissions to talk to the Key Management Service.
+
+Furthermore, version 2.0.0 adds support for loading multiple Redshift clusters in 
+parallel. You can deploy the 2.x versions with a 1.1x configuration, and the 
+Lambda function will transparently upgrade your configuration to a 2.x compatible 
+format. This uses a loadClusters List type in DynamoDB to track all clusters to 
+be loaded.
 
 ----
 
